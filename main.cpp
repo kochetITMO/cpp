@@ -1,14 +1,10 @@
 #include <cstdlib>
 #include <iostream>
-
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <cstring>
 
 const uint32_t POWER = 31;
-const size_t BUFFER_SIZE = 8192;
 
 uint32_t hash(const char *str, size_t size) {
     uint32_t result = 0;
@@ -26,31 +22,12 @@ uint32_t pow(uint32_t x, uint32_t p) {
     return res;
 }
 
-bool check(
-        const char *pred_buffer,
-        const char *buffer,
-        size_t BUFFER_SIZE,
-        const char *target,
-        size_t target_size,
-        ssize_t start
-) {
-    size_t i = 0;
-    while (start < 0 && i < target_size) {
-        if (target[i] != pred_buffer[BUFFER_SIZE + start]) {
+bool check(const char *buffer, const char *target, ssize_t start, size_t target_size) {
+    for (size_t i = 0; i < target_size; i++, start = (start + 1) % target_size) {
+        if (buffer[start] != target[i]) {
             return false;
         }
-        i++;
-        start++;
     }
-
-    while (i < target_size) {
-        if (target[i] != buffer[start]) {
-            return false;
-        }
-        i++;
-        start++;
-    }
-
     return true;
 }
 
@@ -60,8 +37,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    size_t size = strlen(argv[1]);
-    uint32_t target_hash = hash(argv[1], size);
+    ssize_t target_size = strlen(argv[1]);
+    uint32_t target_hash = hash(argv[1], target_size);
 
     FILE *fd = fopen(argv[2], "rb");
     if (fd == nullptr) {
@@ -72,64 +49,40 @@ int main(int argc, char *argv[]) {
     size_t cnt = 0;
     uint32_t actual_hash = 0;
 
-    uint32_t delta_power = pow(POWER, size - 1);
+    uint32_t delta_power = pow(POWER, target_size - 1);
 
-    char pred_buffer[BUFFER_SIZE];
+    char buffer[target_size];
 
-    for (;;) {
-        char buffer[BUFFER_SIZE];
-        ssize_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, fd);
-
-        if (bytes_read < 0) {
-            perror("read failed");
-            fclose(fd);
-            return EXIT_FAILURE;
-        }
-
-        if (bytes_read == 0) {
-            std::cout << "false\n";
-            break;
-        }
-
-        ssize_t i = 0;
-        for (; cnt < size && i < bytes_read; ++i, ++cnt) {
-            actual_hash = actual_hash * POWER + buffer[i];
-        }
-        if (i == bytes_read && cnt < size) {
-            continue;
-        }
-
-        for (; i <= bytes_read; ++i) {
-            if (actual_hash == target_hash) {
-                bool res = check(
-                        pred_buffer,
-                        buffer,
-                        BUFFER_SIZE,
-                        argv[1],
-                        size,
-                        i - size
-                );
-                if (res) {
-                    std::cout << "true\n";
-                    fclose(fd);
-                    return EXIT_SUCCESS;
-                }
-            } else if (i != bytes_read) {
-                auto pred = BUFFER_SIZE + i - (ssize_t) size;
-                auto now = i - (ssize_t) size;
-                auto pred_char = (now >= 0) ?
-                                 buffer[now] :
-                                 pred_buffer[pred];
-                auto add_char = buffer[i];
-
-                actual_hash = actual_hash - pred_char * delta_power;
-                actual_hash = actual_hash * POWER + add_char;
-            }
-        }
-
-        std::memcpy(pred_buffer, buffer, bytes_read);
+    char c = getc(fd);
+    for (; cnt < target_size && c != EOF; ++cnt, c = getc(fd)) {
+        buffer[cnt] = c;
+        actual_hash = actual_hash * POWER + c;
+    }
+    if (c == EOF && cnt < target_size) {
+        std::cout << "false\n";
+        fclose(fd);
+        return EXIT_SUCCESS;
     }
 
+    size_t i = 0;
+    for (; c != EOF; c = getc(fd)) {
+        if (actual_hash == target_hash) {
+            bool res = check(buffer, argv[1], i, target_size);
+            if (res) {
+                std::cout << "true\n";
+                fclose(fd);
+                return EXIT_SUCCESS;
+            }
+        } else {
+            actual_hash = actual_hash - buffer[i] * delta_power;
+            actual_hash = actual_hash * POWER + c;
+
+            buffer[i] = c;
+            i = (i + 1) % target_size;
+        }
+    }
+
+    std::cout << "false\n";
     fclose(fd);
     return EXIT_SUCCESS;
 }
