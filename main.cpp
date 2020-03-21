@@ -56,7 +56,7 @@ bool check(
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        std::cerr << "Please enter the STRING and FILE NAME";
+        std::cerr << "Please enter STRING and FILE NAME";
         return EXIT_FAILURE;
     }
 
