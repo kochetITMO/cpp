@@ -8,6 +8,7 @@
 #include <cstring>
 
 const uint32_t POWER = 31;
+const size_t BUFFER_SIZE = 8192;
 
 uint32_t hash(const char *str, size_t size) {
     uint32_t result = 0;
@@ -73,7 +74,6 @@ int main(int argc, char *argv[]) {
 
     uint32_t delta_power = pow(POWER, size - 1);
 
-    const size_t BUFFER_SIZE = 8192;
     char pred_buffer[BUFFER_SIZE];
 
     for (;;) {
