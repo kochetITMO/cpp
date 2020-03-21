@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     uint32_t delta_power = pow(POWER, size - 1);
 
-    const size_t BUFFER_SIZE = 3;
+    const size_t BUFFER_SIZE = 8192;
     char pred_buffer[BUFFER_SIZE];
 
     for (;;) {
